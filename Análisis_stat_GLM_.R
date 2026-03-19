@@ -875,9 +875,7 @@ visreg(fit = M5,
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank()
   )
-### fin
-#######
 
+####
 
-### hshdllddlñsñdjsnsfsfjj
-####Jack
+#### inicio  
