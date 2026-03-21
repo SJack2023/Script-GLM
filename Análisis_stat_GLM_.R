@@ -54,7 +54,6 @@ boxplot(datos_p$H_den, datos_p$H_fue, col=c("skyblue", "orange"), main="Humedad"
 boxplot(datos_p$T_den, datos_p$T_fue, col=c("blue", "red"), main="Temperatura", names=c("Dentro del parche", "Fuera del parche"))
 
 pru_Whi <- wilcox.test(datos_p$T_den, datos_p$T_fue)
-pru_Whi
 
 
 
