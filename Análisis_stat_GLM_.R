@@ -1,4 +1,4 @@
-#1. Libraries
+#1. Libraries. Esta es una propuesta de cambios
 library(readxl)
 library(dplyr)
 library(ggplot2)  
