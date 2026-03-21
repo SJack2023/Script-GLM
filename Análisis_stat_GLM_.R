@@ -1,3 +1,4 @@
+#1. Libraries
 library(readxl)
 library(dplyr)
 library(ggplot2)  
@@ -7,6 +8,7 @@ library(car)
 library(gridExtra)
 library(stats)
 library(visreg)
+
 
 ###### Anális en zona con patrones ######
 datos_p <- read.csv("datos_p.csv", header = TRUE, row.names = 1)
