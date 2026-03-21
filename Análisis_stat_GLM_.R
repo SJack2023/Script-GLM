@@ -36,10 +36,9 @@ levene_results1
 datos_p$Gru <- NULL  ## eliminar columna 
 View(datos_p)
 
-hum_f <- datos_p$H_fue
-hum_d <- datos_p$H_den 
-tem_d <- datos_p$T_den
-tem_f <- datos_p$T_fue 
+
+hum <- datos_p$V_hu 
+tem <- datos_p$V_te
 pen <- datos_p$Pen
 
 t_pa<- datos_p$T_par
@@ -61,7 +60,7 @@ pru_Whi <- wilcox.test(datos_p$T_den, datos_p$T_fue)
 
 
 ##### R lineal múltiple tamaño de parches vs f. abióticos  #####
-modelo_1 <- lm(t_pa ~ tem_d + tem_f + hum_d + hum_f + pen, data = datos_p)
+modelo_1 <- lm(t_pa ~ tem + hum + pen, data = datos_p)
 summary(modelo_1)  
 ### Metodo stepwise
 step(modelo_1, direction = "backward", test = "F")   
