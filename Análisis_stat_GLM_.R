@@ -174,9 +174,7 @@ summary(M2)
 1-(deviance(M2)/M2$null.deviance) 
 pseudo_R_2 <- (M2$null.deviance-M2$deviance)/M2$null.deviance*100
 pseudo_R_2
-?deviance
-
-
+?deviance 
 
 
 M3 <- glm(n_pa ~ hum_d+hum_f+tem_d+tem_f+pen, 
@@ -692,19 +690,15 @@ table(total_pa$Pre_aus)
 total_pa$PA <- ifelse(total_pa$Pre_aus > 0, 1, 0)
 table(total_pa$PA)
 pre_au <- total_pa$Pre_aus
-hum_f <- total_pa$H_fue
-hum_d <- total_pa$H_den 
-
-tem_d <- total_pa$T_den
-tem_f <- total_pa$T_fue 
-
+hum <- total_pa$V_hu
+tem <- total_pa$V_te
 pen <- total_pa$Pen
 N_pa <- total_pa$N_par
 T_pa <- total_pa$T_par
 N_in <- total_pa$N_ind
 
 
-M10 <- glm(total_pa$Pre_aus ~ tem_d + tem_f+ hum_d + hum_f+ pen, 
+M10 <- glm(total_pa$Pre_aus ~ tem+ hum+ pen, 
               data = total_pa, family = binomial)
 summary(M10)
 # Equivalente a R2 ( D2) es
@@ -715,9 +709,10 @@ pseudo_R5
 step(M10, direction = "backward", test = "Chisq")
 
 
-M11 <- glm(total_pa$Pre_aus ~ tem_d + tem_f+ hum_d + pen, 
+M11 <- glm(total_pa$Pre_aus ~ tem, 
           data = total_pa, family = binomial)
 summary(M11)
+
 # Equivalente a R2 ( D2) es
 1-(deviance(M11)/M11$null.deviance) 
 pseudo_R6 <- (M11$null.deviance-M11$deviance)/M11$null.deviance*100
@@ -730,43 +725,53 @@ library(visreg)
 library(patchwork)
 
 
-
-
-# Funcion 
-plot_logistico_4 <- function(fit_obj, x_var_name, xtitle, ytitle = "") {
-  visreg(fit_obj, x_var_name, scale = "response", gg = TRUE, 
-         line = list(col = "#007BA7"), 
+plot_logistico <- function(fit_obj, x_var_name, y_var_name, data, xtitle, ytitle = "") {
+  
+  visreg(fit_obj, x_var_name, scale = "response", gg = TRUE,
+         line = list(col = "#007BA7"),
          fill = list(fill = "#E0F2F7")) +
-    # Rug plot: Visualiza los puntos observados 
-    geom_rug(aes_string(x = x_var_name), sides = "tb", alpha = 0.4, color = "black") +
-    scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.25)) +
+    
+    #  Observaciones reales 
+    geom_point(data = total_pa,
+               aes_string(x = x_var_name, y = y_var_name),
+               alpha = 0.3,
+               size = 1.5,
+               color = "black",
+               position = position_jitter(height = 0.02)) +
+    
+    # Rug plot
+    geom_rug(data = total_pa,
+             aes_string(x = x_var_name),
+             sides = "tb",
+             alpha = 0.4,
+             color = "black") +
+    
+    scale_y_continuous(limits = c(0, 1),
+                       breaks = seq(0, 1, 0.25)) +
+    
     labs(x = xtitle, y = ytitle) +
+    
     theme_bw() +
     theme(
       panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
       axis.title = element_text(size = 14, face = "bold"),
-      axis.text = element_text(size = 14, color = "black"),
+      axis.text = element_text(size = 12, color = "black"),
       panel.grid = element_blank()
     )
 }
 
-# Crear los 4 gráficos individuales
 
-p1 <- plot_logistico_4(M11, "tem_d", "TDP (°C)", "Prob. de Presencia")
-p2 <- plot_logistico_4(M11, "tem_f", "TFP (°C)", "")
-p3 <- plot_logistico_4(M11, "hum_d", "HDP (%)", "Prob. de Presencia")
-p4 <- plot_logistico_4(M11, "pen",   "Pendiente (grad)", "")
+p1 <- plot_logistico(
+  M11,
+  "tem",             
+  "Pre_aus",       
+  total_pa,
+  "Variación de temperatura (°C)",
+  "Prob. de Presencia"
+)
 
-# Combinación final en cuadrícula 2x2
-plot_m11 <- (p1 + p2) / (p3 + p4) + 
-  plot_annotation(
-    title = " ",
-    subtitle = " ",
-    theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
-  )
+print(p1)
 
-# Visualizar
-print(plot_m11)
 
 
 
