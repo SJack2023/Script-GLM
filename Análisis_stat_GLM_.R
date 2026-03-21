@@ -48,10 +48,13 @@ n_pa <- datos_p$N_par
 
 # Analisis exploratorio 
 
-list(Humedad = t.test(datos_p$H_den, datos_p$H_fue), Temperatura = t.test(datos_p$T_den, datos_p$T_fue))
+list(Humedad = t.test(datos_p$V_hu, s_pa$V_hu), Temperatura = t.test(datos_p$V_te, s_pa$V_te))
 par(mfrow = c(1, 2))
-boxplot(datos_p$H_den, datos_p$H_fue, col=c("skyblue", "orange"), main="Humedad", names=c("Dentro del parche", "Fuera del parche"))
-boxplot(datos_p$T_den, datos_p$T_fue, col=c("blue", "red"), main="Temperatura", names=c("Dentro del parche", "Fuera del parche"))
+
+boxplot(datos_p$V_hu,  s_pa$V_hu, col=c("skyblue", "orange"), main="Humedad", names=c("Bandas", "Manchas"))
+boxplot(datos_p$V_te, s_pa$V_te , col=c("blue", "red"), main="Temperatura", names=c("B ", "M"))
+
+
 
 pru_Whi <- wilcox.test(datos_p$T_den, datos_p$T_fue)
 pru_Whi
