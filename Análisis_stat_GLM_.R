@@ -64,27 +64,18 @@ summary(modelo_1)
 ### Metodo stepwise
 step(modelo_1, direction = "backward", test = "F")   
 
-modelo_2 <- lm(t_pa ~ pen, data = datos_p)
+modelo_2 <- lm(t_pa ~ hum_d + hum_f + tem_d, data = datos_p)
 summary(modelo_2)  
 
 
  # Plot
 library(visreg)
-visreg(fit = modelo_2, xvar = "pen", scale="response",
-       partial = TRUE,
-       gg = TRUE,
-       labs(x = "Pendiente", 
-            y = "Tamaño del parche") +
-       theme_light() +            
-       theme(axis.title = element_text(size = 12)))
-
-
-v <- visreg(modelo_2, "pen", scale = "response", plot = FALSE)
+v <- visreg(modelo_2, "hum_d", scale = "response", plot = FALSE)
 plot(v, 
      gg = TRUE, 
      partial = TRUE,
      fill = list(fill = "lightgrey")) + 
-  labs(x = "Pendiente", 
+  labs(x = "HDP", 
        y = "Tamaño del parche",
        title = "Efecto de la pendiente en el tamaño del parche") +
   
@@ -97,72 +88,67 @@ plot(v,
     panel.grid.minor = element_blank()
   )
 
+library(ggplot2)
+library(ggeffects)
+library(patchwork)
 
 # 1. Generar predicciones marginales
-pred_pen <- ggpredict(modelo_2, terms = "pen")
+pred_hd <- ggpredict(modelo_2, terms = "hum_d")
+pred_hf <- ggpredict(modelo_2, terms = "hum_f")
+pred_td <- ggpredict(modelo_2, terms = "tem_d")
 
-# 2. Función optimizada con marco profesional y estilo limpio
-plot_glm_completo <- function(preds, original_data, x_var, title, xtitle) {
+# 2. Función optimizada (Sin errores de duplicación)
+plot_glm_completo <- function(preds, original_data, x_var, xtitle) {
   ggplot() +
-    # Puntos observados con jitter
+    # Puntos observados
     geom_jitter(data = original_data, 
-                aes_string(x = x_var, y = "t_pa"), 
-                alpha = 0.3, size = 1.5, width = 0.2, color = "gray40") +
-    # Cinta de error (IC 95%)
+                aes(x = .data[[x_var]], y = t_pa), 
+                alpha = 0.2, size = 1.2, width = 0.2, color = "gray50") +
+    # Intervalo de confianza
     geom_ribbon(data = preds, 
                 aes(x = x, ymin = conf.low, ymax = conf.high), 
-                fill = "#2c7fb8", alpha = 0.25) +
+                fill = "#2c7fb8", alpha = 0.2) +
     # Línea de tendencia
     geom_line(data = preds, 
               aes(x = x, y = predicted), 
-              color = "#2c7fb8", size = 1.2) +
-    # Etiquetas y títulos
-    labs(title = title, x = xtitle, y = "Tamaño del parche (m)") +
-    # Estética profesional
-    theme_minimal(base_size = 12) +
+              color = "#2c7fb8", linewidth = 1) +
+    labs(x = xtitle, y = "Tamaño del parche (m)") +
+    # Usamos theme_bw o theme_minimal 
+    theme_minimal() + 
     theme(
-      panel.border = element_rect(colour = "black", fill = NA, size = 1),
-      axis.text.x = element_text(size = 12, color = "black"), 
-      axis.text.y = element_text(size = 12, color = "black"), 
+      # Bordes y líneas
+      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.8),
       panel.grid.minor = element_blank(),
-      panel.grid.major = element_line(color = "gray95"), 
-      plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
-      axis.title = element_text(size = 13),
-      axis.ticks = element_line(colour = "black")
+      panel.grid.major = element_line(color = "gray96"),
+      axis.ticks = element_line(colour = "black"),
+    
+      axis.title = element_text(size = 16, face = "bold", color = "black"), # Títulos ejes
+      axis.text = element_text(size = 13, color = "black"),                # Números ejes
+      strip.text = element_text(size = 14, face = "bold")                  # Por si usas facets
     )
 }
 
-# 3. Crear el gráfico base
-p1 <- plot_glm_completo(pred_pen, datos_p, "pen", "", "Pendiente (grad)")
+# 3. Crear los gráficos 
+p1 <- plot_glm_completo(pred_hd, datos_p, "H_den", "HDP (%)") + 
+  coord_cartesian(ylim = c(0, 7.5)) 
 
+p2 <- plot_glm_completo(pred_hf, datos_p, "H_fue", "HFP (%)") + 
+  coord_cartesian(ylim = c(0, 7.5))
 
-# 4. Ajustar escalas y PROPORCIÓN (Aquí está el truco)
-p1 <- p1 + 
-  scale_x_continuous(
-    breaks = seq(0, 25, by = 5), 
-    expand = expansion(mult = c(0.02, 0.02)) # Pequeño margen para no pegar los puntos al borde
-  ) + 
-  scale_y_continuous(
-    breaks = seq(0, 6, by = 1.5), 
-    expand = expansion(mult = c(0, 0.05))
-  ) +
-  coord_cartesian(ylim = c(0, 6)) +
-  # Fuerza al gráfico a tener una forma armónica (puedes probar con 0.5 o 0.6)
-  theme(aspect.ratio = 0.7) 
+p3 <- plot_glm_completo(pred_td, datos_p, "T_den", "TDP(°C)") + 
+  coord_cartesian(ylim = c(0, 4))
 
-# 5. Combinación final con limpieza de títulos
-plot_final <- p1 + 
-  labs(
-    title = "Efecto de la pendiente sobre el tamaño del parche",
-    caption = "Modelo de regresión lineal múltiple en la zona con patrones"
-  ) +
-  theme(
-    plot.title = element_text(size = 14, face = "bold", hjust = 0.5, margin = margin(b = 10)),
-    plot.caption = element_text(size = 9, hjust = 1, face = "italic", color = "gray30")
+# 4. Combinación final
+plot_final <- (p1 + p2) / p3 + 
+  plot_annotation(
+    title = " ",
+    theme = theme(
+      plot.title = element_text(size = 20, face = "bold", hjust = 0.5)
+    )
   )
 
-# Visualizar
 print(plot_final)
+
 
 
 
@@ -180,7 +166,7 @@ pseudo_R
 ### Metodo stepwise
 step(M1, direction = "backward", test = "Chisq")
 
-M2 <- glm(n_in ~ hum_d+hum_f+tem_d+pen, 
+M2 <- glm(n_in ~ hum_f, 
           data = datos_p, 
           family = poisson(link = "log")) 
 summary(M2)
@@ -188,6 +174,8 @@ summary(M2)
 1-(deviance(M2)/M2$null.deviance) 
 pseudo_R_2 <- (M2$null.deviance-M2$deviance)/M2$null.deviance*100
 pseudo_R_2
+?deviance
+
 
 
 
@@ -202,7 +190,7 @@ pseudo_R1
 ### Metodo stepwise
 step(M3, direction = "backward", test = "Chisq")
 
-M4 <- glm(n_pa ~ hum_d + pen, 
+M4 <- glm(n_pa ~ tem_d, 
           data = datos_p, 
           family = poisson(link = "log")) 
 summary(M4)
@@ -221,10 +209,9 @@ library(patchwork)
 
 #  Generar predicciones marginales
 # Usamos ggpredict para obtener la curva ajustada del GLM
-pred_hum_d <- ggpredict(M2, terms = "hum_d")
+
 pred_hum_f <- ggpredict(M2, terms = "hum_f")
-pred_tem_d <- ggpredict(M2, terms = "tem_d")
-pred_pen   <- ggpredict(M2, terms = "pen")
+
 
 #  Función para incluir puntos observados
 plot_glm_completo <- function(preds, original_data, x_var, title, xtitle) {
@@ -241,41 +228,33 @@ plot_glm_completo <- function(preds, original_data, x_var, title, xtitle) {
     geom_line(data = preds, 
               aes(x = x, y = predicted), 
               color = "#2c7fb8", size = 1.2) +
-    coord_cartesian(ylim = c(0,100)) +
+    coord_cartesian(ylim = c(0,75)) +
     # Theme y etiquetas
     labs(title = title, x = xtitle, y = "N° Individuos") +
-    theme_minimal(base_size = 12) +
+    theme_minimal(base_size = 16) +
     theme(
       panel.border = element_rect(colour = "black", fill = NA, size = 0.8),
-      axis.text.x = element_text(size = 12, color = "black"), # Tamaño números eje X
-      axis.text.y = element_text(size = 12, color = "black"), # Tamaño números eje Y
+      axis.text.x = element_text(size = 16, color = "black"), # Tamaño números eje X
+      axis.text.y = element_text(size = 16, color = "black"), # Tamaño números eje Y
       panel.grid.minor = element_blank(),
       panel.grid.major = element_line(color = "gray95"), # Cuadrícula muy sutil
-      plot.title = element_text(face = "bold", size = 11),
-      axis.title = element_text(size = 12),
+      plot.title = element_text(face = "bold", size = 16),
+      axis.title = element_text(size = 16),
       axis.ticks = element_line(colour = "black") # Añade pequeñas marcas en los ejes
     )
 }
 
-#  Crear los 4 gráficos individuales
+#  Crear los  gráficos individuales
 
-p1 <- plot_glm_completo(pred_hum_d, datos_p, "hum_d", "HDP", "Humedad (%)")
-p2 <- plot_glm_completo(pred_hum_f, datos_p, "hum_f", "HFP", "Humedad (%)")
-p3 <- plot_glm_completo(pred_tem_d, datos_p, "tem_d", "TDP", "Temperatura (°C)")
-p4 <- plot_glm_completo(pred_pen,   datos_p, "pen",   "", "Pendiente (grad)")
+p1 <- plot_glm_completo(pred_hum_f, datos_p, "hum_f", " ", "Humedad fuera del parche (%)")
 
-# Eliminar etiquetas del eje y
-p2 <- p2 + theme(axis.title.y = element_blank())
-p4 <- p4 + theme(axis.title.y = element_blank())
 
-#Modificar la escala del eje X solo para p2
-p4 <- p4 + scale_x_continuous(breaks = seq(0, 30, by = 5))
 
 #  Combinación final con Patchwork
-plot_final <- (p1 + p2) / (p3 + p4) + 
+plot_final <- p1  
   plot_annotation(
-    title = "Efecto de las variables abiótica sobre el número de inviduos",
-    caption = "Modelo de Poisson en la zona con patrones: número de individuos",
+    title = " ",
+    caption = " ",
     theme = theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
   )
 
@@ -287,8 +266,8 @@ print(plot_final)
 
 
 #  Generar predicciones marginales 
-pred_hum_d <- ggpredict(M4, terms = "hum_d")
-pred_pen   <- ggpredict(M4, terms = "pen")
+pred_te_d <- ggpredict(M4, terms = "tem_d")
+
 
 #  Función para incluir puntos observados
 plot_glm_completo <- function(preds, original_data, x_var, title, xtitle) {
@@ -308,35 +287,34 @@ plot_glm_completo <- function(preds, original_data, x_var, title, xtitle) {
     coord_cartesian(ylim = c(0,15)) +
     # Theme y etiquetas
     labs(title = title, x = xtitle, y = "N° parches") +
-    theme_minimal(base_size = 12) +
+    theme_minimal(base_size = 16) +
     theme(
       panel.border = element_rect(colour = "black", fill = NA, size = 0.8),
-      axis.text.x = element_text(size = 12, color = "black"), # Tamaño números eje X
-      axis.text.y = element_text(size = 12, color = "black"), # Tamaño números eje Y
+      axis.text.x = element_text(size = 16, color = "black"), # Tamaño números eje X
+      axis.text.y = element_text(size = 16, color = "black"), # Tamaño números eje Y
       panel.grid.minor = element_blank(),
       panel.grid.major = element_line(color = "gray95"), # Cuadrícula muy sutil
-      plot.title = element_text(face = "bold", size = 12),
-      axis.title = element_text(size = 13),
+      plot.title = element_text(face = "bold", size = 16),
+      axis.title = element_text(size = 16),
       axis.ticks = element_line(colour = "black") # Añade pequeñas marcas en los ejes
     )
 }
 
 #  Crear los gráficos individuales
 
-p1 <- plot_glm_completo(pred_hum_d, datos_p, "hum_d", "HDP", "Humedad (%)")
-p2 <- plot_glm_completo(pred_pen,   datos_p, "pen",   "", "Pendiente (grad)")
+p1 <- plot_glm_completo(pred_te_d, datos_p, "tem_d", " ", "Temperatura dentro del parche (°C)")
 
 # Eliminar etiquetas del eje y
-p2 <- p2 + theme(axis.title.y = element_blank())
+#p2 <- p2 + theme(axis.title.y = element_blank())
 
 #Modificar la escala del eje X solo para p2
-p2 <- p2 + scale_x_continuous(breaks = seq(0, 30, by = 5))
+#p2 <- p2 + scale_x_continuous(breaks = seq(0, 30, by = 5))
 
 #  Combinación final con Patchwork
-plot_final <- p1 + p2 + 
+plot_final <- p1  
   plot_annotation(
-    title = "Efecto de las variables abiótica sobre el número de parches",
-    caption = "Modelo de Poisson en la zona con patrones: número de parches",
+    title = " ",
+    caption = " ",
     theme = theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
   )
 
@@ -398,8 +376,8 @@ levene_results
 s_pa$Gru <- NULL
 View(s_pa)
 
-pru_Whi2 <- wilcox.test(s_pa$T_den, s_pa$T_fue)
-
+pru_Whi2 <- wilcox.test(s_pa$T_den, s_pa$T_fue, exact = FALSE)
+pru_Whi2
 
 
 ### Regresión lineal múltiple tamaño de parches vs f. abióticos ###
@@ -407,22 +385,23 @@ modelo_3 <- lm(T_pa ~ tem_d2 + tem_f2 + hum_d2 + hum_f2 + pen2, data = s_pa)
 summary(modelo_3)  
 ## Metodo stepwise
 step(modelo_3, direction = "backward", test = "F") 
-modelo_4 <- lm(T_pa ~ tem_d2 + tem_f2, data = s_pa)
+modelo_4 <- lm(T_pa ~ hum_d2 + hum_f2 + pen2, data = s_pa)
 summary(modelo_4) 
 
 ## PLot 
 
 
 # tamaño de parche en zona sin patrones vs v abioticas
-pred_tem_d2 <- ggpredict(modelo_4, terms = "tem_d2")
-pred_tem_f2 <- ggpredict(modelo_4, terms = "tem_f2")
+pred_hum_d2 <- ggpredict(modelo_4, terms = "hum_d2")
+pred_hum_f2 <- ggpredict(modelo_4, terms = "hum_f2")
+pred_pen2 <- ggpredict(modelo_4, terms = "hum_f2")
 
-p1 <- ggplot(pred_tem_d2, aes(x = x, y = predicted)) +
+p1 <- ggplot(pred_hum_d2, aes(x = x, y = predicted)) +
   geom_line(color = "#2c3e50", size = 1) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, fill = "#2c3e50") +
   labs(
-    title = "TDP",
-    x = "Temperatura dentro del parche",
+    title = " ",
+    x = " HDP ",
     y = "Tamaño del parche"
   ) +
   theme_minimal() +
@@ -433,12 +412,12 @@ p1 <- ggplot(pred_tem_d2, aes(x = x, y = predicted)) +
     axis.text.y = element_text(size = 13)     # Números eje Y
   )
 
-p2 <- ggplot(pred_tem_f2, aes(x = x, y = predicted)) +
+p2 <- ggplot(pred_hum_f2, aes(x = x, y = predicted)) +
   geom_line(color = "#e74c3c", size = 1) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, fill = "#e74c3c") +
   labs(
-    title = "TDP",
-    x = "Temperatura fuera del parche",
+    title = " ",
+    x = " HFP ",
     y = "Tamaño del parche"
   ) +
   theme_minimal() +
@@ -449,79 +428,73 @@ p2 <- ggplot(pred_tem_f2, aes(x = x, y = predicted)) +
     axis.text.y = element_text(size = 13)
   )
 
-grafico_final <- p1 + p2 + 
+grafico_final <- p1 + p2 
   plot_annotation(
-    title = 'Análisis de Regresión Múltiple: Tamaño de Parche',
+    title = ' ',
     subtitle = ' ',
-    caption = ' Zona sin patrones ',
+    caption = '  ',
     
     theme = theme(plot.title = element_text(size = 18, face = "bold"))
   )
 
 print(grafico_final)
 
-## Plot
+## Plot  modelo final
+# 1. Generar predicciones 
+pred_h_f  <- ggpredict(modelo_4, terms = "hum_f2")
+pred_h_d  <- ggpredict(modelo_4, terms = "hum_d2")
+pred_pen2 <- ggpredict(modelo_4, terms = "pen2")
 
-#  Generar predicciones marginales
-pred_t_f  <- ggpredict(modelo_4, terms = "tem_f2")
-pred_t_d  <- ggpredict(modelo_4, terms = "tem_d2")
-
-#  Función 
 plot_lm_pro <- function(preds, original_data, x_var, title, xtitle) {
   ggplot() +
-    # Datos observados 
+    # Datos observados (puntos)
     geom_jitter(data = original_data, 
                 aes_string(x = x_var, y = "T_pa"), 
-                alpha = 0.35, size = 1.6, width = 0.2, color = "gray40") +
+                alpha = 0.4, size = 1.8, width = 0.1, color = "gray40") +
     # Intervalo de confianza 
     geom_ribbon(data = preds, 
                 aes(x = x, ymin = conf.low, ymax = conf.high), 
-                fill = "#87CEEB", alpha = 0.3) +
-    # Línea de tendencia 
+                fill = "#87CEEB", alpha = 0.2) +
+    # Línea de tendencia
     geom_line(data = preds, 
               aes(x = x, y = predicted), 
-              color = "#007BA7", size = 1.3) + 
+              color = "#007BA7", linewidth = 1.2) +
     
-    #CONFIGURACIÓN DE ESCALAS 
-    coord_cartesian(ylim = c(0, 2)) + 
-    # Eje Y
-    scale_y_continuous(breaks = seq(0, 2, by = 0.5), expand = c(0, 0)) +
-    # Eje X
-    scale_x_continuous(breaks = seq(22, 36, by = 2), expand = c(0.02, 0.02)) +
+    # ESCALA UNIFICADA
+    coord_cartesian(ylim = c(0, 3)) + 
+    scale_y_continuous(breaks = seq(0, 3, by = 0.5), expand = c(0, 0)) +
     
-    # Etiquetas y Estética
     labs(title = title, x = xtitle, y = "Tamaño del Parche (m)") +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 14) +
     theme(
-      panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
-      axis.text.x = element_text(size = 13, color = "black"), # Números eje X
-      axis.text.y = element_text(size = 13, color = "black"), # Números eje Y
+      panel.border = element_rect(colour = "black", fill = NA, linewidth = 1.2),
       axis.text = element_text(size = 13, color = "black"),
-      axis.title = element_text(size = 12, face = "bold"),
-      plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+      axis.title = element_text(size = 15, face = "bold"),
+      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
       panel.grid.minor = element_blank(),
       panel.grid.major = element_line(color = "gray96"),
       axis.ticks = element_line(colour = "black")
     )
 }
 
-# Crear los gráficos individuales
-p1 <- plot_lm_pro(pred_t_f, s_pa, "tem_f2", "TFP ", "Temperatura (°C)")
-p2 <- plot_lm_pro(pred_t_d, s_pa, "tem_d2", "TDP ", "Temperatura (°C)")
+#  Crear gráficos individuales
+p1 <- plot_lm_pro(pred_h_f, s_pa, "hum_f2", " ", "HFP (%)")
+p2 <- plot_lm_pro(pred_h_d, s_pa, "hum_d2", " ", "HDP (%)")
+p3 <- plot_lm_pro(pred_pen2, s_pa, "pen2", " ", " Pendiente (grad)")
 
-#  Eliminar etiqueta Y del segundo gráfico 
-p2 <- p2 + theme(axis.title.y = element_blank())
+#  Quitar etiquetas repetidas 
+p2 <- p2 + theme(axis.title.y = element_blank(), axis.text.y = element_blank())
 
-#  Combinación final 
-plot_2m <- (p1 | p2) + 
+# Combinación Final (2 arriba, 1 abajo con mismo ancho)
+plot_final <- (p1 + p2) / p3 + 
+  plot_layout(heights = c(1, 1)) + # Filas de igual altura
   plot_annotation(
-    title = "Efecto de la temperatura sobre el tamaño de parche",
-    caption = "Modelo de Regresión lineal múltiple | Zona sin patrones: número de individuos",
-    theme = theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5))
+    title = " ",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5))
   )
 
-# Visualizar
-print(plot_2m)
+print(plot_final)
+
 
 
 #### Modelo Poisson sin_patrones #### 
@@ -563,7 +536,7 @@ pseudo_R3 <- (M8$null.deviance-M8$deviance)/M8$null.deviance*100
 pseudo_R3
 
 
-M9 <- glm(N_pa ~ hum_d2 + hum_f2 + tem_d2, 
+M9 <- glm(N_pa ~ pen2 + tem_f2, 
           data = s_pa, 
           family = poisson(link = "log"))
 summary(M9)
@@ -586,7 +559,7 @@ pred_t_d  <- ggpredict(M7, terms = "tem_d2")
 pred_t_f  <- ggpredict(M7, terms = "tem_f2")
 pred_pen  <- ggpredict(M7, terms = "pen2")
 
-# Función optimizada para visualización profesional
+# Función optimizada 
 plot_glm_5 <- function(preds, original_data, x_var, title, xtitle, color_hex = "#2c7fb8") {
   ggplot() +
     # Datos observados con jitter (transparencia para ver densidad)
@@ -605,24 +578,24 @@ plot_glm_5 <- function(preds, original_data, x_var, title, xtitle, color_hex = "
     # AJUSTE DE ESCALA
     coord_cartesian(ylim = c(0, 100)) + 
     labs(title = title, x = xtitle, y = "N° Individuos") +
-    theme_minimal(base_size = 12) +
+    theme_minimal(base_size = 16) +
     theme(
       panel.border = element_rect(colour = "black", fill = NA, size = 0.8),
-      axis.text.x = element_text(size = 12, color = "black"), # Tamaño números eje X
-      axis.text.y = element_text(size = 12, color = "black"), # Tamaño números eje Y
+      axis.text.x = element_text(size = 16, color = "black"), # Tamaño números eje X
+      axis.text.y = element_text(size = 16, color = "black"), # Tamaño números eje Y
       panel.grid.minor = element_blank(),
       panel.grid.major = element_line(color = "gray95"), # Cuadrícula muy sutil
-      plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
-      axis.title = element_text(size = 12),
+      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+      axis.title = element_text(size = 16),
       axis.ticks = element_line(colour = "black") # Añade pequeñas marcas en los ejes
     )
 }
 
 # Crear los 5 gráficos individuales
-p1 <- plot_glm_5(pred_h_d, s_pa, "hum_d2", "HDP", "Humedad (%)", "#87CEEB")
-p2 <- plot_glm_5(pred_h_f, s_pa, "hum_f2", "HFP", "Humedad (%)", "#87CEEB")
-p3 <- plot_glm_5(pred_t_d, s_pa, "tem_d2", "TDP", "Temperatura (°C)", "#87CEEB")
-p4 <- plot_glm_5(pred_t_f, s_pa, "tem_f2", "TFP", "Temperatura (°C)", "#87CEEB")
+p1 <- plot_glm_5(pred_h_d, s_pa, "hum_d2", " ", "Humedad dentro del parche(%)", "#87CEEB")
+p2 <- plot_glm_5(pred_h_f, s_pa, "hum_f2", " ", "Humedad fuera del parche(%)", "#87CEEB")
+p3 <- plot_glm_5(pred_t_d, s_pa, "tem_d2", " ", "Temperatura dentro del parche(°C)", "#87CEEB")
+p4 <- plot_glm_5(pred_t_f, s_pa, "tem_f2", " ", "Temperatura fuera del parche (°C)", "#87CEEB")
 p5 <- plot_glm_5(pred_pen, s_pa, "pen2",   " ",  "Pendiente (grad)",  "#87CEEB")
 
 #  Ajuste específico 
@@ -638,9 +611,9 @@ p5 <- p5 + theme(axis.title.y = element_blank())
 # plot_spacer() llena el hueco vacío para mantener la simetría
 plot_m7 <- (p1 + p2 + p3) / (p4 + p5 + plot_spacer()) + 
   plot_annotation(
-    title = "Efecto de variables abióticas sobre el número de individuos",
+    title = " ",
     subtitle = " ",
-    caption = " Modelo de Poisson en la zona sin patrones",
+    caption = " ",
     theme = theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5))
   )
 
@@ -653,9 +626,10 @@ library(ggeffects)
 library(patchwork)
 
 # Predicciones
-pred_h_d  <- ggpredict(M9, terms = "hum_d2")
-pred_h_f  <- ggpredict(M9, terms = "hum_f2")
-pred_t_d  <- ggpredict(M9, terms = "tem_d2")
+pred_t_f  <- ggpredict(M9, terms = "tem_f2")
+pred_pen_2 <- ggpredict(M9, terms = "pen2")
+
+
 
 plot_glm_m9 <- function(preds, original_data, x_var, title, xtitle) {
   ggplot() +
@@ -672,35 +646,35 @@ plot_glm_m9 <- function(preds, original_data, x_var, title, xtitle) {
               aes(x = x, y = predicted), 
               color = "#87CEEB", size = 1.2) +
     # AJUSTE DE ESCALA
-    coord_cartesian(ylim = c(0, 20)) + 
+    coord_cartesian(ylim = c(0, 15)) + 
     # Theme y etiquetas
     labs(title = title, x = xtitle, y = "N° de Parches") +
-    theme_minimal(base_size = 12) +
+    theme_minimal(base_size = 16) +
     theme(
       panel.border = element_rect(colour = "black", fill = NA, size = 0.8),
-      axis.text.x = element_text(size = 12, color = "black"), # Tamaño números eje X
-      axis.text.y = element_text(size = 12, color = "black"), # Tamaño números eje Y
+      axis.text.x = element_text(size = 16, color = "black"), # Tamaño números eje X
+      axis.text.y = element_text(size = 16, color = "black"), # Tamaño números eje Y
       panel.grid.minor = element_blank(),
       panel.grid.major = element_line(color = "gray95"), # Cuadrícula muy sutil
-      plot.title = element_text(face = "bold", size = 11, hjust = 0.5),
-      axis.title = element_text(size = 12),
+      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+      axis.title = element_text(size = 16),
       axis.ticks = element_line(colour = "black") # Añade pequeñas marcas en los ejes
     )
 }
 
-# Crear los 3 gráficos individuales
-p1 <- plot_glm_m9(pred_h_d, s_pa, "hum_d2", "HDP", "Humedad (%)")
-p2 <- plot_glm_m9(pred_h_f, s_pa, "hum_f2", "HFP", "Humedad (%)")
-p3 <- plot_glm_m9(pred_t_d, s_pa, "tem_d2", "TDP", "Temperatura (°C)")
+# Crear los gráficos individuales
+p1 <- plot_glm_m9(pred_t_f, s_pa, "tem_f2", " ", "Temperatura fuera del parche(°C)")
+p2 <- plot_glm_m9(pred_pen_2, s_pa, "pen2", " ", " Pendiente")
+
 
 ## eliminar etiquetas de p2
 p2 <- p2 + theme(axis.title.y = element_blank())
 
 # Combinación final con Patchwork
-plot_m9 <- (p1 | p2) / (p3 + plot_spacer()) + 
+plot_m9 <- (p1 | p2) + 
   plot_annotation(
-    title = "Efecto de las variables abióticas sobre el número de parches",
-    caption = "Modelo de Poisson M9 | Zona sin patrones",
+    title = "",
+    caption = " ",
     theme = theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5))
   )
 
@@ -770,8 +744,8 @@ plot_logistico_4 <- function(fit_obj, x_var_name, xtitle, ytitle = "") {
     theme_bw() +
     theme(
       panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
-      axis.title = element_text(size = 12, face = "bold"),
-      axis.text = element_text(size = 12, color = "black"),
+      axis.title = element_text(size = 14, face = "bold"),
+      axis.text = element_text(size = 14, color = "black"),
       panel.grid = element_blank()
     )
 }
@@ -786,8 +760,8 @@ p4 <- plot_logistico_4(M11, "pen",   "Pendiente (grad)", "")
 # Combinación final en cuadrícula 2x2
 plot_m11 <- (p1 + p2) / (p3 + p4) + 
   plot_annotation(
-    title = "Probabilidad de Presencia vs. Variables Ambientales",
-    subtitle = "Modelos de Regresión Logística",
+    title = " ",
+    subtitle = " ",
     theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
   )
 
@@ -880,4 +854,4 @@ visreg(fit = M5,
 
 ####
 
-#### inicio  
+
