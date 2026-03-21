@@ -65,7 +65,7 @@ summary(modelo_1)
 ### Metodo stepwise
 step(modelo_1, direction = "backward", test = "F")   
 
-modelo_2 <- lm(t_pa ~ hum_d + hum_f + tem_d, data = datos_p)
+modelo_2 <- lm(t_pa ~ pen, data = datos_p)
 summary(modelo_2)  
 
 
@@ -94,9 +94,8 @@ library(ggeffects)
 library(patchwork)
 
 # 1. Generar predicciones marginales
-pred_hd <- ggpredict(modelo_2, terms = "hum_d")
-pred_hf <- ggpredict(modelo_2, terms = "hum_f")
-pred_td <- ggpredict(modelo_2, terms = "tem_d")
+pred_pen <- ggpredict(modelo_2, terms = "pen")
+
 
 # 2. Función optimizada (Sin errores de duplicación)
 plot_glm_completo <- function(preds, original_data, x_var, xtitle) {
@@ -130,17 +129,11 @@ plot_glm_completo <- function(preds, original_data, x_var, xtitle) {
 }
 
 # 3. Crear los gráficos 
-p1 <- plot_glm_completo(pred_hd, datos_p, "H_den", "HDP (%)") + 
+p1 <- plot_glm_completo(pred_pen, datos_p, "Pen", "Pendiente (grad)") + 
   coord_cartesian(ylim = c(0, 7.5)) 
 
-p2 <- plot_glm_completo(pred_hf, datos_p, "H_fue", "HFP (%)") + 
-  coord_cartesian(ylim = c(0, 7.5))
-
-p3 <- plot_glm_completo(pred_td, datos_p, "T_den", "TDP(°C)") + 
-  coord_cartesian(ylim = c(0, 4))
-
 # 4. Combinación final
-plot_final <- (p1 + p2) / p3 + 
+plot_final <- p1 + 
   plot_annotation(
     title = " ",
     theme = theme(
