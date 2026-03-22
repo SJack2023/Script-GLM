@@ -169,6 +169,55 @@ ggplot(pca_scores, aes(x = PC1, y = PC2, color = Gru))+
   scale_color_manual(values = c("Manchas"="blue", "Bandas"="red"))+
   theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
 
+simper(scale_data, data_total$Gru)
+
+## Regresion logistica
+std_data <- as.data.frame(scale_data)
+std_data$Gru <- factor(data_total$Gru)
+
+log_model <- glm(Gru ~ V_te + V_hu + Pen,
+                 data = std_data,
+                 family = binomial)
+summary(log_model)
+
+## Logistic Regressión Plot
+newdata <- data.frame(
+  V_te = seq(min(std_data$V_te), max(std_data$V_te), length.out = 200),
+  V_hu = 0,
+  Pen = 0)
+
+predicts <- predict(log_model, newdata = newdata, type = "link", se.fit = TRUE)
+
+fit_link <- predicts$fit
+se_fit <- predicts$se.fit
+
+CI_lower <- fit_link - 1.96 * se_fit
+CI_upper <- fit_link + 1.96 * se_fit
+
+newdata$probs <- plogis(fit_link)
+newdata$CI_lower <- plogis(CI_lower)
+newdata$CI_upper <- plogis(CI_upper)
+
+ggplot(std_data, aes(x = V_te, y = as.numeric(Gru)-1)) +
+  geom_point(aes(color = Gru),
+             position = position_jitter(height = .01)) +
+  geom_ribbon(data = newdata,
+              aes(x = V_te, ymin = CI_lower, ymax = CI_upper),
+              alpha = .2,
+              fill = "gray50",
+              inherit.aes = FALSE) +
+  geom_line(data = newdata,
+            aes(x = V_te, y = probs),
+            color = "black",
+            linewidth = 1) +
+  labs(x = "Variación temperatura (estandarizada)",
+       y = "Probabilidad",
+       color = "Tipo de patrón") +
+  theme_minimal() +
+  scale_color_manual(values = c("Manchas" = "blue", "Bandas" = "red"))+
+  theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
+
 
 ##### R lineal múltiple tamaño de parches vs f. abióticos  #####
 modelo_1 <- lm(t_pa ~ tem_d + tem_f + hum_d + hum_f + pen, data = datos_p)
@@ -178,7 +227,6 @@ step(modelo_1, direction = "backward", test = "F")
 
 modelo_2 <- lm(t_pa ~ hum_d + hum_f + tem_d, data = datos_p)
 summary(modelo_2)  
-
 
  # Plot
 library(visreg)
