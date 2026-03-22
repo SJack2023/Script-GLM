@@ -57,6 +57,10 @@ boxplot(datos_p$V_te, s_pa$V_te , col=c("blue", "red"), main="Temperatura", name
 
 pru_Whi <- wilcox.test(datos_p$T_den, datos_p$T_fue)
 
+#Media y desviación estándar
+sapply(datos_p[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], mean)
+sapply(datos_p[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], sd)
+
 
 
 ##### R lineal múltiple tamaño de parches vs f. abióticos  #####
