@@ -1,3 +1,12 @@
+# -*- Coding: utf8 -*-
+# Author: Jack Barboza
+
+#"""
+# Language: R script
+# This a temporary script file
+#"""
+
+
 #1. Libraries. Esta es una propuesta de cambios
 library(readxl)
 library(dplyr)
@@ -107,6 +116,59 @@ ggplot(df_plot, aes(x = grupo, y = media, color = grupo)) +
         strip.placement = "outside",        
         strip.text = element_text(hjust = 0.5, face = "bold", vjust = 0.5),
         panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
+
+## Permanova
+library(vegan)
+data_total <- rbind(data_spotted, data_striped)
+data_total$Gru <- rep(c("Manchas", "Bandas"), each = n_plots)
+data_varnames <- colnames(data_total)
+scale_data <- scale(data_total[, data_varnames[-1]])
+
+adonis2(scale_data ~ Gru, data = data_total, permutations = 999, method = "euclidean")
+
+
+## PCA
+pca_data <- prcomp(scale_data, center = TRUE)
+summary(pca_data)
+
+## PCA plot
+pca_scores <- as.data.frame(pca_data$x)
+pca_scores$Gru <- data_total$Gru
+
+ggplot(pca_scores, aes(x = PC1, y = PC2, color = Gru))+
+  geom_point(size = 3)+
+  stat_ellipse(level = 0.95) +
+  labs(x = "PC1", y = "PC2", color = "Tipo de patrón")+
+  coord_cartesian(xlim = c(-1.7*max(abs(pca_scores$PC1)), 1.7*max(abs(pca_scores$PC1))),
+                  ylim = c(-1.5*max(abs(pca_scores$PC2)), 1.5*max(abs(pca_scores$PC2))))+
+  theme_minimal()+
+  scale_color_manual(values = c("Manchas"="blue", "Bandas"="red"))+
+  theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
+## Biplot
+pca_loads <- as.data.frame(pca_data$rotation)
+pca_loads$var <- c("VT", "VH", "P",
+          "NI", "LP", "NP")
+
+ggplot(pca_scores, aes(x = PC1, y = PC2, color = Gru))+
+  geom_point(size = 3)+
+  stat_ellipse(level = 0.95) +
+  geom_segment(data = pca_loads,
+               aes(x = 0, y = 0, xend = PC1*2.5, yend = PC2*2.5),
+               arrow = arrow(length = unit(.2, "cm")),
+               color = "black",
+               inherit.aes = FALSE) +
+  geom_text(data = pca_loads,
+            aes(x = PC1*2, y = PC2*3, label=var),
+            color = "black",
+            size = 3,
+            inherit.aes = FALSE)+
+  labs(x = "PC1", y = "PC2", color = "Tipo de patrón")+
+  theme_minimal()+
+  scale_color_manual(values = c("Manchas"="blue", "Bandas"="red"))+
+  theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
 
 ##### R lineal múltiple tamaño de parches vs f. abióticos  #####
 modelo_1 <- lm(t_pa ~ tem_d + tem_f + hum_d + hum_f + pen, data = datos_p)
