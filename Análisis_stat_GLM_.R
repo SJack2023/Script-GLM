@@ -58,11 +58,55 @@ boxplot(datos_p$V_te, s_pa$V_te , col=c("blue", "red"), main="Temperatura", name
 
 pru_Whi <- wilcox.test(datos_p$T_den, datos_p$T_fue)
 
-#Media y desviación estándar
-sapply(datos_p[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], mean)
-sapply(datos_p[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], sd)
 
 
+# Media y desviación estándar. Irbin
+data_spotted <- read.csv("datos_p.csv", header = TRUE, row.names = 1)
+data_striped <- read.csv("sin_patrones.csv", header = TRUE, row.names = 1)
+
+n_plots <- length(data_spotted$Gru)
+means_spotted <- sapply(data_spotted[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], mean)
+stdes_spotted <- sapply(data_spotted[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], sd)
+
+means_striped <- sapply(data_striped[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], mean)
+stdes_striped <- sapply(data_striped[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], sd)
+
+# Intervalos de confianza
+SEs_spotted <- stdes_spotted/sqrt(n_plots)
+CIs_spotted <- qt(.975, df=n_plots - 1) * SEs_spotted
+
+SEs_striped <- stdes_striped/sqrt(n_plots)
+CIs_striped <- qt(.975, df=n_plots - 1) * SEs_striped
+
+# Graficos
+vars <- c("Variación temperatura", "Variación humedad", "Pendiente",
+          "Número de individuos", "Longitud parche", "Número de parches")
+
+df_plot <- data.frame(
+  variable = rep(vars, 2),
+  media = c(means_spotted, means_striped),
+  CI = c(CIs_spotted, CIs_striped),
+  grupo = rep(c("Manchas", "Bandas"), each = length(vars))
+)
+
+df_plot$grupo <- factor(df_plot$grupo, levels = c("Manchas", "Bandas"))
+
+ggplot(df_plot, aes(x = grupo, y = media, color = grupo)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = media - CI, ymax = media + CI),
+                width = 0.2) +
+  facet_wrap(~variable,
+             scales = "free_y", strip.position = "left",
+             labeller = labeller(variable = vars)) +  
+  labs(color = "Tipo de patrón", x = NULL, y = NULL)+
+  scale_color_manual(values = c("Manchas" = "blue", "Bandas" = "red"))+
+  scale_y_continuous(n.breaks = 5) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())+
+  theme(axis.text.x = element_blank(),
+        strip.placement = "outside",        
+        strip.text = element_text(hjust = 0.5, face = "bold", vjust = 0.5),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
 
 ##### R lineal múltiple tamaño de parches vs f. abióticos  #####
 modelo_1 <- lm(t_pa ~ tem_d + tem_f + hum_d + hum_f + pen, data = datos_p)
