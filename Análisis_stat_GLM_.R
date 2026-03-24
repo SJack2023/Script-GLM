@@ -1,3 +1,12 @@
+# -*- Coding: utf8 -*-
+# Author: Jack Barboza
+
+#"""
+# Language: R script
+# This a temporary script file
+#"""
+
+
 #1. Libraries. Esta es una propuesta de cambios
 library(readxl)
 library(dplyr)
@@ -209,6 +218,156 @@ n_pa <- datos_p$N_par
 
 
 
+# Media y desviación estándar. Irbin
+data_spotted <- read.csv("datos_p.csv", header = TRUE, row.names = 1)
+data_striped <- read.csv("sin_patrones.csv", header = TRUE, row.names = 1)
+
+n_plots <- length(data_spotted$Gru)
+means_spotted <- sapply(data_spotted[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], mean)
+stdes_spotted <- sapply(data_spotted[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], sd)
+
+means_striped <- sapply(data_striped[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], mean)
+stdes_striped <- sapply(data_striped[c("V_te", "V_hu", "Pen", "N_ind", "T_par", "N_par")], sd)
+
+# Intervalos de confianza
+SEs_spotted <- stdes_spotted/sqrt(n_plots)
+CIs_spotted <- qt(.975, df=n_plots - 1) * SEs_spotted
+
+SEs_striped <- stdes_striped/sqrt(n_plots)
+CIs_striped <- qt(.975, df=n_plots - 1) * SEs_striped
+
+# Graficos
+vars <- c("Variación temperatura", "Variación humedad", "Pendiente",
+          "Número de individuos", "Longitud parche", "Número de parches")
+
+df_plot <- data.frame(
+  variable = rep(vars, 2),
+  media = c(means_spotted, means_striped),
+  CI = c(CIs_spotted, CIs_striped),
+  grupo = rep(c("Manchas", "Bandas"), each = length(vars))
+)
+
+df_plot$grupo <- factor(df_plot$grupo, levels = c("Manchas", "Bandas"))
+
+ggplot(df_plot, aes(x = grupo, y = media, color = grupo)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = media - CI, ymax = media + CI),
+                width = 0.2) +
+  facet_wrap(~variable,
+             scales = "free_y", strip.position = "left",
+             labeller = labeller(variable = vars)) +  
+  labs(color = "Tipo de patrón", x = NULL, y = NULL)+
+  scale_color_manual(values = c("Manchas" = "blue", "Bandas" = "red"))+
+  scale_y_continuous(n.breaks = 5) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())+
+  theme(axis.text.x = element_blank(),
+        strip.placement = "outside",        
+        strip.text = element_text(hjust = 0.5, face = "bold", vjust = 0.5),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
+
+## Permanova
+library(vegan)
+data_total <- rbind(data_spotted, data_striped)
+data_total$Gru <- rep(c("Manchas", "Bandas"), each = n_plots)
+data_varnames <- colnames(data_total)
+scale_data <- scale(data_total[, data_varnames[-1]])
+
+adonis2(scale_data ~ Gru, data = data_total, permutations = 999, method = "euclidean")
+
+
+## PCA
+pca_data <- prcomp(scale_data, center = TRUE)
+summary(pca_data)
+
+## PCA plot
+pca_scores <- as.data.frame(pca_data$x)
+pca_scores$Gru <- data_total$Gru
+
+ggplot(pca_scores, aes(x = PC1, y = PC2, color = Gru))+
+  geom_point(size = 3)+
+  stat_ellipse(level = 0.95) +
+  labs(x = "PC1", y = "PC2", color = "Tipo de patrón")+
+  coord_cartesian(xlim = c(-1.7*max(abs(pca_scores$PC1)), 1.7*max(abs(pca_scores$PC1))),
+                  ylim = c(-1.5*max(abs(pca_scores$PC2)), 1.5*max(abs(pca_scores$PC2))))+
+  theme_minimal()+
+  scale_color_manual(values = c("Manchas"="blue", "Bandas"="red"))+
+  theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
+## Biplot
+pca_loads <- as.data.frame(pca_data$rotation)
+pca_loads$var <- c("VT", "VH", "P",
+          "NI", "LP", "NP")
+
+ggplot(pca_scores, aes(x = PC1, y = PC2, color = Gru))+
+  geom_point(size = 3)+
+  stat_ellipse(level = 0.95) +
+  geom_segment(data = pca_loads,
+               aes(x = 0, y = 0, xend = PC1*2.5, yend = PC2*2.5),
+               arrow = arrow(length = unit(.2, "cm")),
+               color = "black",
+               inherit.aes = FALSE) +
+  geom_text(data = pca_loads,
+            aes(x = PC1*2, y = PC2*3, label=var),
+            color = "black",
+            size = 3,
+            inherit.aes = FALSE)+
+  labs(x = "PC1", y = "PC2", color = "Tipo de patrón")+
+  theme_minimal()+
+  scale_color_manual(values = c("Manchas"="blue", "Bandas"="red"))+
+  theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
+simper(scale_data, data_total$Gru)
+
+## Regresion logistica
+std_data <- as.data.frame(scale_data)
+std_data$Gru <- factor(data_total$Gru)
+
+log_model <- glm(Gru ~ V_te + V_hu + Pen,
+                 data = std_data,
+                 family = binomial)
+summary(log_model)
+
+## Logistic Regressión Plot
+newdata <- data.frame(
+  V_te = seq(min(std_data$V_te), max(std_data$V_te), length.out = 200),
+  V_hu = 0,
+  Pen = 0)
+
+predicts <- predict(log_model, newdata = newdata, type = "link", se.fit = TRUE)
+
+fit_link <- predicts$fit
+se_fit <- predicts$se.fit
+
+CI_lower <- fit_link - 1.96 * se_fit
+CI_upper <- fit_link + 1.96 * se_fit
+
+newdata$probs <- plogis(fit_link)
+newdata$CI_lower <- plogis(CI_lower)
+newdata$CI_upper <- plogis(CI_upper)
+
+ggplot(std_data, aes(x = V_te, y = as.numeric(Gru)-1)) +
+  geom_point(aes(color = Gru),
+             position = position_jitter(height = .01)) +
+  geom_ribbon(data = newdata,
+              aes(x = V_te, ymin = CI_lower, ymax = CI_upper),
+              alpha = .2,
+              fill = "gray50",
+              inherit.aes = FALSE) +
+  geom_line(data = newdata,
+            aes(x = V_te, y = probs),
+            color = "black",
+            linewidth = 1) +
+  labs(x = "Variación temperatura (estandarizada)",
+       y = "Probabilidad",
+       color = "Tipo de patrón") +
+  theme_minimal() +
+  scale_color_manual(values = c("Manchas" = "blue", "Bandas" = "red"))+
+  theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5))
+
+
+
 ##### R lineal múltiple tamaño de parches vs f. abióticos  #####
 modelo_1 <- lm(t_pa ~ tem + hum + pen, data = datos_p)
 summary(modelo_1)  
@@ -217,7 +376,6 @@ step(modelo_1, direction = "backward", test = "F")
 
 modelo_2 <- lm(t_pa ~ pen, data = datos_p)
 summary(modelo_2)  
-
 
  # Plot
 library(visreg)
